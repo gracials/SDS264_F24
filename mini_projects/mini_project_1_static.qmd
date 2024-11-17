@@ -1,0 +1,140 @@
+---
+title: "Mini Project 1"
+format:
+  pdf: default
+editor_options: 
+  chunk_output_type: console
+---
+
+https://data.hrsa.gov/maps/mchb
+
+```{r}
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+cesarean_delivery <- read_csv("~/Desktop/Cesarean Delivery - All (%) 2020-2022 - Output for External Tool v2/Cesarean Delivery - All (%) 202-Table 1.csv") 
+
+cesarean_delivery
+```
+
+
+```{r}
+#loading in info to draw US states for geom_polygon
+library(maps)
+states_polygon <- as_tibble(map_data("state")) |>
+  select(region, group, order, lat, long)
+
+# See what the state (region) levels look like in states_polygon
+unique(states_polygon$region)
+
+#loading in info to draw US states for geom_sf and leaflet
+library(sf)
+states_sf <- read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson") |>
+  select(name, geometry)
+
+# See what the state (name) levels look like in states_sf
+unique(states_sf$name)
+
+c_delivery <- as_tibble(cesarean_delivery) |>
+  filter()
+
+# See what the state (State) levels look like in c_delivery
+unique(c_delivery$State)
+```
+
+
+```{r}
+# Matching the key values
+library(lubridate)
+
+states_polygon <- states_polygon |>
+  mutate(region = str_to_title(region))
+states_polygon
+```
+
+```{r}
+# Checking what states/regions need to be filtered out
+c_delivery |>
+  anti_join(states_polygon, by = c("State" = "region")) |>
+  count(State)
+
+c_delivery |> 
+  anti_join(states_sf, by = c("State" = "name")) |>
+  count(State)
+```
+
+```{r}
+# Filtering 
+c_delivery <- c_delivery |>
+  filter(!(State %in% c("alaska",
+                       "american samoa",
+                       "federated states of micronesia",
+                       "guam",
+                       "hawaii",
+                       "marshall islands",
+                       "northern mariana islands",
+                       "puerto rico",
+                       "republic of palau",
+                       "u.s minor islands",
+                       "u.s. virgin islands")))
+c_delivery
+```
+
+
+```{r}
+# Merging for static
+c_del_polygon <- c_delivery |>
+   group_by(State) |> 
+  summarise(mean_c_section_delivery = round(mean(`Cesarean Delivery - All (%) 2020-2022`), digits = 1), 
+            mean_urban_rural = round(mean(`NCHS Urban-Rural Code`, na.rm = TRUE), digits = 0)) |>
+  right_join(states_polygon, by = c("State" = "region"))
+c_del_polygon
+```
+
+
+```{r}
+#Merging for interactive
+temp <- c_delivery |>
+   group_by(State) |>
+  summarise(mean_c_section_delivery = round(mean(`Cesarean Delivery - All (%) 2020-2022`), digits = 1),
+            mean_urban_rural = round(mean(`NCHS Urban-Rural Code`, na.rm = TRUE), digits = 0))
+
+c_del_sf_1 <- states_sf |>
+  left_join(temp, by = c("name" = "State"))
+```
+
+
+# Average Percent Cesarian Deliveries By State 2020-2022 (static plot)
+```{r}
+library(viridis)
+c_del_polygon |>
+  ggplot(mapping = aes(x = long, y = lat, group = group)) + 
+    geom_polygon(aes(fill = mean_c_section_delivery), color = "black") + 
+    labs(fill = "Average % Cesarian Deliveries", caption = "Data Source: https://data.hrsa.gov/maps/mchb", title = "Average % Cesarian Deliveries By State (2020-2022)") +
+    coord_map() + 
+   theme_void() +  
+   scale_fill_viridis() 
+```
+- This graph is a map of the continental United States color coded with state-level data of the average percent of deliveries which were cesarean (c-sections) in the years 2020-2022, aggregated from county-level data. The average percent of deliveries which were cesarean varies from approximately 24% to 38%. The graph highlights that the South tends to have higher rates of cesarian deliveries, especially Louisiana and Mississippi, while the West and upper-western Midwest tend to have lower rates of cesarian sections. 
+
+
+# Average County Urban-Rural Code by State (static plot)
+```{r}
+table(c_del_polygon$mean_urban_rural)
+
+c_del_polygon |>
+    ggplot(mapping = aes(x = long, y = lat, group = group)) + 
+    geom_polygon(aes(fill = as.factor(mean_urban_rural)), color = "black") + 
+    labs(fill = "Average County Urban-Rural Code", caption = "Data Source: https://data.hrsa.gov/maps/mchb", title = "Average County Urban-Rural Code by State") +
+    coord_map() + 
+    theme_void() +
+   scale_fill_viridis(discrete = TRUE) 
+```
+- This graph is a map of the continental US color-coded at the state-level by the mean county urban-rural code. The mean county urban-rural code ranges from 2 (most urban) to 6 (most rural). States on the east coast have the lowest urban-rural code, meaning that the average of state's counties' urban-rural codes is the most urban. States in the South and on the west coast are next-most urban. The states that are the most rural are North Dakota, South Dakota, Montana, and Wyoming. 
+
+
+
+
+

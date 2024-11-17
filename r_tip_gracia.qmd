@@ -1,0 +1,497 @@
+---
+title: "cowplot package"
+subtitle: "Gracia Larsen-Schmidt"
+format:
+  revealjs: 
+    slide-number: true
+    chalkboard: 
+      buttons: false
+    logo: cowplot_graphic.png
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+#loading in libraries
+#install.packages(cowplot)
+library(cowplot)
+library(knitr)
+library(tidyverse)
+```
+
+```{r}
+#bringing in dataset
+outer_space_objects <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2024/2024-04-23/outer_space_objects.csv')
+```
+
+```{r include = FALSE}
+# scatterplot of objects sent into space over time 
+all_entities_over_time <- outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+all_entities_over_time
+```
+
+```{r include = FALSE}
+# Creating a table of overall totals to find out which entities sent out the most 1957-2023. "World" is the overall, combined total of objects launched into outer space. 
+total_count <- outer_space_objects |>
+  select(-c(Year, Code)) |>
+  group_by(Entity) |>
+  mutate(total = sum(num_objects)) |>
+  select(total) |>
+  unique() |>
+  arrange(desc(total))
+total_count
+
+kable(head(total_count, 10))
+```
+
+```{r include = FALSE}
+# This graph maps the trajectory of number of objects sent out over time using the non-"World" entities above that have sent out the most total since 1957 (US, Russia, China, UK, and Japan) 
+top_5_over_time <- outer_space_objects |>
+  filter(Entity %in% c("United States","Russia", "China", "United Kingdom", "Japan")) |>
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = fct_reorder2(Entity, Year, num_objects))) +
+  geom_point() +
+  labs(title = "Entities Launching the Most Objects Into Space Over Time", 
+       y = "Number of Objects",
+       color = "Entity")
+top_5_over_time
+```
+
+```{r include = FALSE}
+# Bar graph of total objects launched into space (top 5 entities)
+bar_graph_totals <- total_count |>
+  filter(Entity %in% c("United States","Russia", "China", "United Kingdom", "Japan")) |>
+  ggplot(aes(x = fct_reorder(Entity, total, .desc = TRUE), y = total, fill = fct_reorder2(Entity, Entity, total))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Objects Launched Into Space by Top 5 Object-Launching Entities", 
+       x = "Entity", 
+       y = "Total Objects Launched", 
+       fill = "Entity")
+
+bar_graph_totals
+```
+
+## Why cowplot?
+
+  - Easy to use
+  - Works well with ggplot
+  - Useful for producing and organizing figures for projects and publications
+
+::: footer
+Learn more: [cowplot introductory vignette](https://wilkelab.org/cowplot/articles/introduction.html)
+:::
+
+## Data {.smaller}
+
+::: columns
+::: {.column width="45%"}
+<br/> 
+
+#### *Objects Launched into Space*
+This data is from [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday). The dataset, titled "outer_space_objects," includes four variables: Entity, Code, Year (ranging from 1957 to 2023), and a variable indicating the number of objects launched into space in a given year by a given entity. 
+:::
+
+::: {.column width="3%"}
+:::
+
+::: {.column width="52%"}
+
+```{r}
+kable(head(outer_space_objects)[,c("Entity",	"Code", "Year", "num_objects")])
+```
+:::
+:::
+
+::: footer
+Data Source: [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/blob/5c99ca51eed16df5aaa81a814ac0dcd287a1a315/data/2024/2024-04-23/readme.md)
+:::
+
+## plot_grid() {.smaller .scrollable}
+
+::: panel-tabset
+### Unaligned
+
+```{r}
+outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+
+outer_space_objects |>
+  filter(Entity %in% c("United States","Russia", "China", "United Kingdom", "Japan")) |>
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = fct_reorder2(Entity, Year, num_objects))) +
+  geom_point() +
+  labs(title = "Entities Launching the Most Objects Into Space Over Time",
+       y = "Number of Objects",
+       color = "Entity")
+```
+
+### Aligned
+
+```{r}
+all_entities_over_time <- outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+
+top_5_over_time <- outer_space_objects |>
+  filter(Entity %in% c("United States","Russia", "China", "United Kingdom", "Japan")) |>
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = fct_reorder2(Entity, Year, num_objects))) +
+  geom_point() +
+  labs(title = "Entities Launching the Most Objects Into Space Over Time",
+       y = "Number of Objects",
+       color = "Entity")
+
+plot_grid(all_entities_over_time, top_5_over_time, ncol = 1, align = "v")
+```
+:::
+
+::: footer
+Learn more: [Aligning by Axis](https://wilkelab.org/cowplot/articles/aligning_plots.html)
+:::
+
+## Code
+
+```{.r code-line-numbers="1-17|17"}
+all_entities_over_time <- outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+
+top_5_over_time <- outer_space_objects |>
+  filter(Entity %in% c("United States","Russia", "China", "United Kingdom", "Japan")) |>
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = fct_reorder2(Entity, Year, num_objects))) +
+  geom_point() +
+  labs(title = "Entities Launching the Most Objects Into Space Over Time",
+       y = "Number of Objects",
+       color = "Entity")
+
+plot_grid(all_entities_over_time, top_5_over_time, ncol = 1, align = "v")
+```
+
+::: footer
+Learn more: [Aligning by Axis](https://wilkelab.org/cowplot/articles/aligning_plots.html)
+:::
+
+
+## ggdraw function: draw_label() {.smaller}
+```{r}
+all_entities_over_time <- outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+
+ggdraw(all_entities_over_time) +
+  draw_label("Draft", 
+             color = "#FF3333", 
+             size = 75, 
+             angle = 35, 
+             alpha = .25, 
+             x = .5, 
+             y = .55)
+```
+
+::: footer
+Learn more: [Drawing With and on Plots](https://wilkelab.org/cowplot/articles/drawing_with_on_plots.html)
+:::
+
+## Code
+
+```{.r code-line-numbers="1-14|7|8-14"}
+all_entities_over_time <- outer_space_objects |>
+  ggplot(aes(x = Year, y = num_objects)) +
+  geom_point() +
+  labs(title = "Number of Objects Launched Into Space Over Time",
+       y = "Number of Objects")
+
+ggdraw(all_entities_over_time) +
+  draw_label("Draft", 
+             color = "#FF3333", 
+             size = 75, 
+             angle = 35, 
+             alpha = .25, 
+             x = .5, 
+             y = .55)
+```
+
+::: footer
+Learn more: [Drawing With and on Plots](https://wilkelab.org/cowplot/articles/drawing_with_on_plots.html)
+:::
+
+## ggdraw function: draw_image()
+```{r}
+#install.packages("magick")
+library(magick)
+
+ggdraw() + 
+  draw_plot(top_5_over_time) +
+  draw_image("cowplot_graphic.png", 
+             x = 1, 
+             y = 1, 
+             hjust = 1, 
+             vjust = 1, 
+             halign = 1, 
+             valign = 1, 
+             width = .1)
+```
+::: footer
+Learn more: [Drawing With and on Plots](https://wilkelab.org/cowplot/articles/drawing_with_on_plots.html)
+:::
+
+## Code
+```{.r code-line-numbers="1-2|4|5|6-13"}
+#install.packages("magick")
+library(magick)
+
+ggdraw() + 
+  draw_plot(top_5_over_time) +
+    draw_image("cowplot_graphic.png", 
+               x = 1, 
+               y = 1, 
+               hjust = 1, 
+               vjust = 1, 
+               halign = 1, 
+               valign = 1, 
+               width = .1)
+```
+
+::: footer
+Learn more: [Drawing With and on Plots](https://wilkelab.org/cowplot/articles/drawing_with_on_plots.html)
+:::
+
+## theme(), get_legend(), and plot_grid() {.smaller .scrollable}
+::: panel-tabset
+
+### Without cowplot
+```{r}
+bar_graph_totals <- total_count |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  ggplot(aes(x = fct_reorder(Entity, total, .desc = TRUE), 
+             y = total, 
+             fill = fct_reorder2(Entity, Entity, total))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Objects Launched 1957-2013", 
+       x = "Entity", 
+       y = "Total Objects", 
+       fill = "Entity")
+bar_graph_totals
+
+
+top_5_over_time_faceted <- outer_space_objects |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  mutate(Entity = factor(Entity, levels = c("United States",
+                                            "Russia", 
+                                            "China", 
+                                            "United Kingdom", 
+                                            "Japan"))) |> 
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = Entity)) +
+  geom_point() +
+  facet_wrap(~Entity, nrow = 1) +
+  labs(title = "Entities Launching Over Time",
+       y = "Number of Objects",
+       color = "Entity")
+top_5_over_time_faceted
+```
+
+### Using cowplot {.smaller}
+```{r}
+bar_graph_totals <- total_count |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  ggplot(aes(x = fct_reorder(Entity, total, .desc = TRUE), 
+             y = total, 
+             fill = fct_reorder2(Entity, Entity, total))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Objects Launched 1957-2023",
+       x = "", 
+       y = "Total Objects", 
+       fill = "Entity")
+
+
+top_5_over_time_faceted <- outer_space_objects |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  mutate(Entity = factor(Entity, levels = c("United States", 
+                                            "Russia", 
+                                            "China", 
+                                            "United Kingdom", 
+                                            "Japan"))) |> 
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = Entity)) +
+  geom_point() +
+  facet_wrap(~Entity, nrow = 1) +
+  labs(title = "Objects Launched Over Time",
+       y = "Number of Objects")
+
+
+pcol1 <- plot_grid(bar_graph_totals + theme(legend.position="none"),
+                   top_5_over_time_faceted + theme(legend.position="none"),
+                   labels = c('A', 'B'), 
+                   label_size = 15, 
+                   ncol = 1,
+                   align = "v")
+
+legend <- get_legend(bar_graph_totals + theme(legend.box.margin = margin(0, 0, 0, 10)))
+
+plot_grid(pcol1, 
+          legend, 
+          nrow = 1,
+          rel_widths = c(3, .5))
+
+```
+
+:::
+
+::: footer
+Learn more: [Themes](https://wilkelab.org/cowplot/articles/themes.html), [Shared Legends](https://wilkelab.org/cowplot/articles/shared_legends.html), and [Arranging Plots in a Grid](https://wilkelab.org/cowplot/articles/plot_grid.html)
+:::
+
+## Code {.smaller .scrollable}
+```{.r code-line-numbers="1-49|37|38|39|40|41|42|44|46|47|48|49"}
+bar_graph_totals <- total_count |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  ggplot(aes(x = fct_reorder(Entity, total, .desc = TRUE), 
+             y = total, 
+             fill = fct_reorder2(Entity, Entity, total))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Objects Launched 1957-2023",
+       x = "", 
+       y = "Total Objects", 
+       fill = "Entity")
+
+
+top_5_over_time_faceted <- outer_space_objects |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  mutate(Entity = factor(Entity, levels = c("United States", 
+                                            "Russia", 
+                                            "China", 
+                                            "United Kingdom", 
+                                            "Japan"))) |> 
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = Entity)) +
+  geom_point() +
+  facet_wrap(~Entity, nrow = 1) +
+  labs(title = "Objects Launched Over Time",
+       y = "Number of Objects")
+
+
+pcol1 <- plot_grid(bar_graph_totals + theme(legend.position="none"),
+                   top_5_over_time_faceted + theme(legend.position="none"),
+                   labels = c('A', 'B'), 
+                   label_size = 15, 
+                   ncol = 1,
+                   align = "v")
+
+legend <- get_legend(bar_graph_totals + theme(legend.box.margin = margin(0, 0, 0, 10)))
+
+plot_grid(pcol1, 
+          legend, 
+          nrow = 1,
+          rel_widths = c(3, .5))
+
+```
+
+::: footer
+Learn more: [Themes](https://wilkelab.org/cowplot/articles/themes.html), [Shared Legends](https://wilkelab.org/cowplot/articles/shared_legends.html), and [Arranging Plots in a Grid](https://wilkelab.org/cowplot/articles/plot_grid.html)
+:::
+
+## {.smaller}
+```{r}
+bar_graph_totals <- total_count |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  ggplot(aes(x = fct_reorder(Entity, total, .desc = TRUE), 
+             y = total, 
+             fill = fct_reorder2(Entity, Entity, total))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Objects Launched 1957-2023",
+       x = "", 
+       y = "Total Objects", 
+       fill = "Entity")
+
+
+top_5_over_time_faceted <- outer_space_objects |>
+  filter(Entity %in% c("United States",
+                       "Russia", 
+                       "China", 
+                       "United Kingdom", 
+                       "Japan")) |>
+  mutate(Entity = factor(Entity, levels = c("United States", 
+                                            "Russia", 
+                                            "China", 
+                                            "United Kingdom", 
+                                            "Japan"))) |> 
+  group_by(Entity) |>
+  mutate(Entity = Entity) |>
+  ggplot(aes(x = Year, y = num_objects, color = Entity)) +
+  geom_point() +
+  facet_wrap(~Entity, nrow = 1) +
+  labs(title = "Objects Launched Over Time",
+       y = "Number of Objects")
+
+
+pcol1 <- plot_grid(bar_graph_totals + theme(legend.position="none"),
+                   top_5_over_time_faceted + theme(legend.position="none"),
+                   labels = c('A', 'B'), 
+                   label_size = 15, 
+                   ncol = 1,
+                   align = "v")
+
+legend <- get_legend(bar_graph_totals + theme(legend.box.margin = margin(0, 0, 0, 10)))
+
+plot_grid(pcol1, 
+          legend, 
+          nrow = 1,
+          rel_widths = c(3, .5))
+
+```
+
+::: footer
+Learn more: [Themes](https://wilkelab.org/cowplot/articles/themes.html), [Shared Legends](https://wilkelab.org/cowplot/articles/shared_legends.html), and [Arranging Plots in a Grid](https://wilkelab.org/cowplot/articles/plot_grid.html)
+:::
+
+## Questions?

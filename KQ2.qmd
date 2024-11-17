@@ -1,0 +1,221 @@
+---
+title: "Knowledge Quiz 2"
+subtitle: "Gracia Larsen-Schmidt"
+format:
+  pdf: default
+editor_options: 
+  chunk_output_type: console
+---
+
+Please answer the following questions, render a pdf, and submit both the qmd and pdf on moodle by 11 PM on Thurs Nov 14.  Please also leave a copy of your qmd in your Submit folder on the St. Olaf RStudio server.
+
+Guidelines: 
+
+- No consulting with anyone else
+- You may use only materials from this class (our class webpage, links on moodle, our 3 online textbooks, files posted to the RStudio server, your personal notes from class)
+- No online searches or use of large language models like ChatGPT
+
+Pledge: 
+
+I pledge my honor that on this quiz I have neither given nor received assistance not explicitly approved by the professor and that I an aware of no dishonest work.
+
+- type your name here to acknowledge the pledge: Gracia Larsen-Schmidt
+
+- OR
+
+- place an X here if you intentionally are not signing the pledge: 
+
+
+```{r}
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(rvest)
+library(tidytext)
+
+# park_data <- read_csv("~/Sds 264 F24/Class/Data/park_data_KQ2.csv")
+
+park_data <- read_csv("~/Desktop/gitSDS264_F24/park_data_KQ2.csv")
+
+```
+
+## National Park Data
+
+`park_data` is a 54x3 tibble containing information scraped from national park webpages for a past SDS264 final project.  A few notes about the 3 columns:
+
+- `park_code` is a 4-letter code used as a key when merging files
+
+- `address` is comprised of 4 pieces (described from *right* to *left*):
+  - the final piece (following a comma and space) is a zip code (usually 5 digits but sometimes 5 digits then a dash then 4 more digits)
+  - the 2nd to last piece is the state (an abbreviation with 2 capital letters)
+  - the 3rd to last piece is the city (usually one or two words long, occasionally 3; always follows two or more spaces)
+  - the first piece is the street address (often a number and a street, but will always be followed by at least two spaces)
+
+- `activities` is a string of activities offered at each park, where activities are separated by commas
+
+
+## Quiz Questions
+
+Please answer the following questions using your knowledge of strings, regular expressions, and text analysis.  Please use `stringr` functions as much as possible, aim for efficient code, and use good style to make your code as readable as possible!
+
+
+### Section 1
+
+1. Find the subset of all `address` entries that contain a direction (north, south, east, or west).
+```{r}
+str_subset(park_data$address, "North | South | East | West")
+```
+
+
+2. Produce a tibble showing how often each of the 4 directions from (1) occurs among the 54 `address` entries.  Which direction is most common?
+
+```{r}
+park_data |>
+  filter(str_detect(address, "North | South | East | West")) |>
+  mutate(direction = str_extract(address, "North | South | East | West")) |>
+  count(direction) |>
+  arrange(direction)
+```
+
+- "East" is the most common
+
+
+3. Create a new tibble containing only national parks in Alaska (AK) and Hawaii (HI).
+```{r}
+park_data |>
+  filter(str_detect(address, "AK, | HI,"))
+```
+
+### Section 2
+
+4. Build a tibble which adds 4 columns to `park_data`:
+
+- street_address
+- city
+- state
+- zip_code
+
+Hint: sometimes you can extract more than you want, and then remove the extra stuff...
+
+```{r}
+park_data <- park_data |>
+  mutate(street_address = str_extract(address, ".+  "),
+         city = str_extract(address, "  .+,"),
+         state = str_extract(address, "[A-Z][A-Z]"),
+         zip_code = str_extract(address, ", .+"),) |>
+mutate(street_address = str_replace(street_address, "  ", ""), 
+       city = str_replace(city, " [A-Z][A-Z],", ""),
+       city = str_replace(city, "^ +", ""),
+       zip_code = str_replace(zip_code, ", ", ""))
+
+
+park_data
+```
+
+
+Use your new tibble from (4) to answer Questions (5) and (6).  
+
+5. Print the subset of `street_address` entries where the numerical part is 1000 or greater.
+```{r}
+str_subset(park_data$street_address, "\\d\\d\\d\\d")
+```
+
+
+6. Arrange `city` names from longest to shortest.
+```{r}
+park_data |>
+  select(city) |>
+  mutate(city_length = str_count(city, ".")) |>
+  arrange(desc(city_length))
+```
+
+
+### Section 3
+
+7. Create a new column in `park_data` which records the total number of activities in each park, then sort the parks from most activities to least.
+
+```{r}
+park_data <- park_data |>
+  mutate(num_activities = 1 + str_count(activities, "\\b[A-Za-z\\s\\-\\(\\)]+,")) |>
+  arrange(desc(num_activities))
+
+park_data
+```
+
+
+8. Pick off all of the activities that end in "ing"; we'll refer to these as "verb activities".  Produce a count of the number of parks where each "verb activity" appears, and print the "verb activities" and their counts in order from most parks to fewest. (Note that you should consider something like "Group Camping" as different from "RV Camping" or just plain "Camping".)  Your answer should look like the tibble below:
+
+```{r}
+#| eval: FALSE
+
+# A tibble: 57 × 2
+   verb_activity              n
+   <chr>                  <int>
+ 1 Hiking                    50
+ 2 Shopping                  46
+ 3 Stargazing                34
+ 4 Wildlife Watching         31
+ 5 Camping                   30
+ 6 Scenic Driving            26
+ 7 Horse Trekking            23
+ 8 Canoe or Kayak Camping    22
+ 9 Group Camping             22
+10 Paddling                  21
+# 47 more rows
+```
+
+Hint: if you produce a list where each element in the list is a vector (with differing numbers of strings), you can use `unlist` to produce a single character vector
+
+```{r}
+list_verbs <- str_extract_all(park_data$activities, "\\b[A-Za-z\\s\\-\\(\\)\\/]+ing\\b")
+
+verbs <- as.tibble((unlist(list_verbs))) |>
+  mutate(verb_activity = value) |>
+  count(verb_activity) |>
+  arrange(desc(n))
+
+verbs
+```
+
+- My counts aren't the same as your example, but when I check my regular expression using str_view, I don't see any obvious errors in how I am extracting the verbs. 
+```{r}
+str_view(park_data$activities, "\\b([A-Za-z\\s\\-\\(\\)\\/])+ing\\b")
+```
+
+- I also checked a few of of the  individually, and they seem to be right, but it's possible my regular expression for checking also contains a mistake.
+```{r}
+park_data |>
+  mutate(Camping = str_detect(activities, "\\bCamping\\b")) |>
+  count(Camping)
+ 
+park_data |>
+  mutate(Hiking = str_detect(activities, "\\bHiking\\b")) |>
+  count(Hiking)
+
+park_data |>
+  mutate(Wildlife_watching = str_detect(activities, "\\bWildlife Watching\\b")) |>
+  count(Wildlife_watching)
+
+park_data |>
+   mutate(Biking = str_detect(activities, "\\bBiking\\b")) |>
+  count(Biking)
+```
+
+- I also checked by just looking through the park_data dataset, and these numbers seemed to be correct, unless I am interpreting the question incorrectly?
+
+
+Use your tibble from (8) to answer Questions (9)-(10).  
+
+9. Print all the "verb activities" that have a capital letter / lower case letter combination that repeats later in the phrase (e.g. "Gh" appears twice).
+
+```{r}
+str_subset(verbs$verb_activity, "([A-Z])([a-z]).*\\1\\2")
+```
+
+
+10. Print all the "verb activities" that have the same consonant appear twice in a row.
+```{r}
+str_subset(verbs$verb_activity, "([^AEIOUaeiou])\\1")
+```
+
