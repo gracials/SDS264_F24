@@ -1,0 +1,254 @@
+---
+title: "Boston Marathon Data Over Time"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+library(tidyverse)
+library(stringr)
+library(rvest)
+library(polite)
+library(maps)
+library(viridis)
+library(htmltools)
+library(tibble)
+library(janitor)
+
+```
+
+## Motivation for pursuing this data
+
+Gender equity in running and road race participation has improved considerably over the past decades since the passing of Title IX and with the work of accompanying efforts to address gender inequality in sporting spaces. In recent years there has been a [renewed push](https://www.runnersworld.com/uk/training/motivation/a60124039/gender-equality-running-racing/) for greater diversity in race participation as various movements demand improved access, safety, structural support, and inclusive body culture for female runners. What's more, [overlapping movements](https://www.nyrr.org/run/guidelines-and-procedures/non-binary-initiative-faqs) have likewise demanded such change and protections for non-binary and queer runners. Notably, recent years have seen the inclusion a of non-binary racing category in numerous races across the US and the world.
+
+When considering gender equity in running, stories such as [Katherine Switzer](https://kathrineswitzer.com/1967-boston-marathon-the-real-story/)'s are often told. Switzer was the first woman to run the Boston Marathon as an official racer, though women certainly ran unofficially prior to Switzer. Switzer's story is especially infamous for the verbal and physical harassment she was forced to encounter while racing. For her official inclusion, for the aggression she encountered, for her persistence despite structural and physical barriers, and for the inspiration she generated, Switzer's story and the 1967 marathon evidence a contentious, yet shifting running scene in the US.
+
+America's elite marathon and the world's oldest annual marathon, the Boston Marathon undoubtedly sets a certain tone for distance running. Though the Boston Marathon is not a mirror representation of the average running population in the US, with the media coverage and attention it receives, the Boston Marathon is one of the most famous marathons and thus exercises a certain influence over the running atmosphere and norms in the US and beyond.
+
+We can look to the Boston Marathon statistics as a way to gauge shifting gender equity within the running world. We recognize that improved gender equality in the Boston Marathon would not be possible without movements for gender parity on smaller, community-level scales. Simultaneously, we take seriously the example that this elite and cherished marathon can set for the broader running world and its future. By preparing tidy data of demographic breakdowns in the Boston Marathon by year, we offer a foundation for analyzing, visualizing, and interpreting the subtle shifts over time in the makeup of America's elite marathon and thus a way to assess shifts (or the lack thereof) in gender parity within the running world.
+
+Data Source: Boston Marathon Statistics through the Boston Athletic Association: http://registration.baa.org/2024/cf/Public/iframe_Statistics.htm
+
+## Experimenting with data scraping and making it polite
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+boston_marathon <- read_html("http://registration.baa.org/2024/cf/Public/iframe_Statistics.htm")
+
+boston <- html_nodes(boston_marathon, css = "table")
+html_table(boston, header = TRUE, fill = TRUE)  # find right table
+running <- html_table(boston, header = TRUE, fill = TRUE)[[5]]
+running
+
+# perform the steps above with the polite package
+session <- bow("http://registration.baa.org/2024/cf/Public/iframe_Statistics.htm", force = TRUE)
+
+result <- scrape(session) |>
+  html_nodes(css = "table") |>
+  html_table(header = TRUE, fill = TRUE)
+running <- result[[5]]
+running
+```
+
+## Justification for the acquisition of this data
+
+We believe the acquisition of this data to be ethical. Using the polite package, we politely requested permission to use the data. The acquisition of this data does not reveal anyone's personal identifying information because we are using data aggregated by gender. Given the benefits of analyzing data regarding race participation, racing categories, and race completion as a means for assessing the progress of gender parity within the running world, we believe the benefits of our data acquisition far outweigh any potential risks of table scraping this data.
+
+## Experimenting with cleaning and troubleshooting
+
+```{r, echo = FALSE}
+running2 <- running[c(3, 4, 5, 6),] |>
+  clean_names() |>
+  mutate(across(.cols = number_entered:percent_finished, .fns = ~ parse_number(.)))
+running2
+```
+
+### Code to check for any lists with less than 5 elements
+
+-   Years 2014-2017 do not have 5 tables like 2018-2024.
+-   Additionally, 2020 did not have any data (likely because of COVID).
+
+```{r}
+check_year <- function(years) {
+    problematic_years <- list()  # List to store problematic years with fewer than 5 tables
+
+    for (year in years) {
+        Sys.sleep(2)  # Pause to avoid overloading the server
+        url <- stringr::str_c("http://registration.baa.org/", year, "/cf/Public/iframe_Statistics.htm")
+        
+        # Start polite session and scrape the webpage
+        session <- bow(url, force = TRUE)
+        stats <- scrape(session) |>
+            html_nodes(css = "table")  # Scrape all tables
+        
+        # Check if there are exactly 5 tables
+        if (length(stats) < 5) {
+            problematic_years[[length(problematic_years) + 1]] <- 
+                paste("Year", year, "doesn't have exactly 5 tables. Found", length(stats), "tables.")
+        }
+    }
+    
+    # If there are any problematic years, print them; otherwise, print a success message
+    if (length(problematic_years) > 0) {
+        message("Issues found in the following years:")
+        print(problematic_years)
+    } else {
+        message("All years passed the table count check.")
+    }
+}
+
+```
+
+```{r, eval = FALSE}
+year_test <- 2014:2024
+year_check <- purrr::map(year_test, check_year)
+```
+
+### Demo of our check_year function
+
+```{r}
+year_test_demo <- 2014
+year_check_demo <- purrr::map(year_test_demo, check_year)
+```
+
+### Checking the table for the error years
+
+-   Table 4 is needed rather than table 5
+
+```{r, message = FALSE, warning = FALSE}
+session <- bow("http://registration.baa.org/2014/cf/Public/iframe_Statistics.htm", force = TRUE)
+
+result <- scrape(session) |>
+  html_nodes(css = "table") |>
+  html_table(header = TRUE, fill = TRUE)
+running <- result[[4]] 
+```
+
+### Code that provided error with purrr:map function that prompted the error fixing above
+
+```{r}
+by_year <- function(year){
+    Sys.sleep(2)
+    url <- str_c("http://registration.baa.org/", year, "/cf/Public/iframe_Statistics.htm")
+    session <- bow(url, force = TRUE)
+    stats <- scrape(session) |>
+        html_nodes(css = "table") |>
+        html_table(header = TRUE, fill = TRUE)
+    stats[[5]] |> 
+    dplyr::slice(c(3, 4, 5, 6)) |>
+    janitor::clean_names() |>
+    mutate(across(2:4, as.numeric),
+           percent_finished = parse_number(percent_finished),
+           year = year)
+    }
+
+years <- 2014:2024
+#boston_10yrs_data <- purrr::map(years, check_year)
+#boston_10years <- list_rbind(boston_10years_data)
+```
+
+### Code for dealing with abnormal years
+
+```{r}
+by_year2 <- function(year) {
+    Sys.sleep(2)
+    
+    # Skip the year 2020
+    if (year == 2020) {
+        message(paste("Skipping year", year))
+        return(NULL)  # Exit the function
+    }
+    
+    url <- str_c("http://registration.baa.org/", year, "/cf/Public/iframe_Statistics.htm")
+    session <- bow(url, force = TRUE)
+    stats <- scrape(session) |>
+        html_nodes(css = "table") |>
+        html_table(header = TRUE, fill = TRUE)
+    
+    # Select the appropriate table based on the year
+    if (year >= 2014 & year <= 2017) {
+        selected_table <- stats[[4]]  # Use the 4th table for 2014-2017
+    } else {
+        selected_table <- stats[[5]]  # Use the 5th table for all other years
+    }
+    
+    # Process the selected table
+    selected_table |>
+        dplyr::slice(c(3, 4, 5, 6)) |>
+        janitor::clean_names() |>
+        mutate(across(2:4, as.numeric),
+               percent_finished = parse_number(percent_finished),
+               year = year)
+}
+
+years <- 2014:2024
+#boston_10yrs_data <- purrr::map(years, by_year2)
+#boston_10years <- list_rbind(boston_10years_data)
+```
+
+### Now the issue is that non-binary was not an option until 2022, causing errors in the slice and across functions -- fixed code for this
+
+```{r,message = FALSE}
+by_year3 <- function(year) {
+    Sys.sleep(2)
+    
+    # Skip the year 2020
+    if (year == 2020) {
+        message(paste("Skipping year", year))
+        return(NULL)  # Exit the function
+    }
+    
+    url <- stringr::str_c("http://registration.baa.org/", year, "/cf/Public/iframe_Statistics.htm")
+    session <- bow(url, force = TRUE)
+    stats <- scrape(session) |>
+        html_nodes(css = "table") |>
+        html_table(header = TRUE, fill = TRUE)
+    
+    # Select the appropriate table based on the year
+    if (year >= 2014 & year <= 2017) {
+        selected_table <- stats[[4]]  # Use the 4th table for 2014-2017
+    } else {
+        selected_table <- stats[[5]]  # Use the 5th table for other years
+    }
+    
+    # Slice different rows based on the year range
+    if (year >= 2014 & year <= 2022) {
+        sliced_table <- selected_table |> 
+            dplyr::slice(c(3, 4, 5))  # Slice rows 3 to 5 for 2014-2022
+    } else {
+        sliced_table <- selected_table |> 
+            dplyr::slice(c(3, 4, 5, 6))  # Slice rows 3 to 6 for other years
+    }
+    
+    # Process the sliced table
+    sliced_table |>
+        janitor::clean_names() |>
+        mutate(across(2:4, as.numeric),
+               percent_finished = parse_number(percent_finished),
+               year = year)
+}
+
+years <- 2014:2024
+boston_10yrs_data <- purrr::map(years, by_year3)
+boston_10years <- list_rbind(boston_10yrs_data)
+```
+
+## Final tibble
+
+```{r}
+print(boston_10years, n = Inf)
+```
+
+## Future analysis
+
+Potential visualization or areas of analyses with this data include:
+
+-   Looking at both race entries and percent finished, can we identify a statistically significant pattern of increasing gender parity over the years between the male and female racing categories? What about the non-binary category? Assuming this category continues, can we continue in the coming years to track whether more nonbinary runners enter with each new year?
+
+-   Assessing the impact of COVID-19 on runners and racing numbers:
+
+    -   How did COVID effect racing numbers? More specifically, it has been argued that [Covid has had a greater impact on girls and women](https://orwh.od.nih.gov/womens-health-equity-inclusion/women-science-and-impact-of-covid-19). Do we see the fall out of this gendered impact of the pandemic within the Boston Marathon statistics?
+
+-   The percent finished category indicates that female runners consistently complete the marathon at slightly lower rates. Though the percent is not by that much, it consistently translates to a difference of over 100 people. We firstly wonder whether this difference is statistically significant. Provided that it is, we are curious as to why women might be slightly less likely to complete the marathon. Could could we contextualize this discrepancy within a historical lack of structural support for female endurance runners?
+
+The Boston Marathon data only presents a few key measurements. While these are crucial for understanding the shifting numbers of the Boston Marathon, future analysis should consider including data that can touch more thoroughly on some other points of measurement, such as data disaggregated by age or race as means for pursuing a more intersectional analysis of gender equality in race participation.

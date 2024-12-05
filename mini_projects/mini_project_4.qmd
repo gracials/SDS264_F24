@@ -1,0 +1,312 @@
+---
+title: "mini_project_4"
+format:
+  html:
+    default: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, echo = FALSE}
+#| include: FALSE
+
+library(tidytext)
+library(textdata)
+library(wordcloud)
+library(wordcloud2)
+library(htmltools)
+library(viridis)
+library(ggthemes)
+library(knitr)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+```
+
+```{r, echo = FALSE, results ='hide'}
+#Loading in an English translation of The Quran from Kaggle
+quran <- read.csv("~/Desktop/mini_project_website/quran.csv")
+
+#renaming some of the columns, adding a title column, and changing the characters “ and ” into standard quote symbols 
+quran <- quran |>
+  select(surah_no, ayah_no_surah, ayah_en, ayah_no_quran) |>
+  rename(surah_chapter = surah_no, 
+         ayah_verse = ayah_no_surah,
+         text = ayah_en, 
+         overall_n = ayah_no_quran) |>
+  mutate(title = "The Holy Quran",
+         text = (str_replace_all(text, "“", "\\\"")),
+         text = (str_replace_all(text, "”", "\\\"")))
+
+quran
+
+```
+
+```{r, echo = FALSE, results ='hide'}
+#loading in the King James Version Bible from Kaggle
+bible <- read.csv("~/Desktop/mini_project_website/bible.csv")
+
+
+# cleaning up the columns, adding an id column that displays a unique id for each verse based on row, and adding a title column
+bible <- bible |>
+  select(-id) |>
+  rename(book = b,
+         surah_chapter = c, 
+         ayah_verse = v,
+         text = t) |>
+  mutate(overall_n = row_number(),
+         title = "King James Version Bible")
+
+bible
+```
+
+```{r, echo = FALSE, results ='hide', message = FALSE}
+# joining the two datasets to make a combined dataset
+holy_books <- quran |>
+  full_join(bible) |>
+  relocate(book)
+
+holy_books
+```
+
+
+
+## Introduction
+How does the form and style of different holy books differ? 
+
+This page seeks to answer this question through an analysis of the textual similarities and differences between the Quran and the KJV Bible. While one can engage--and certainly many have---in comparative *literary* analyses between these two texts, tracking key style patterns through textual quantifications and visualization opens up possibilities for new and different insights. 
+
+The Holy Quran is the central holy text of Islam, while the Bible is the central holy text Christianity. The Quran was originally written in Arabic and the Bible in Hebrew (Old Testament) and Greek (New Testament). A small portion of the Old Testament was written in Biblical Aramaic. As such, it is worth noting that any textual analysis of these texts is a textual analysis of translations, wherein notes on form and style are notes on both the heart of the text and the given translation. 
+
+The Quran and the Bible have a lot in common, including shared stories and moral teachings, and assertion of a monotheistic god. They also have some clear differences: the Quran is much shorter at 6,236 ayahs (verses) while the King James Version of the Bible has 31,102 verses; the Quran is believed to have been revealed and recorded within a short frame of time, while the writing of the Bible occurred across centuries by many different authors;and the Quran is more lyrical and repetitious, while the Bible places more emphasis on storytelling. These differences represent but a sample of the ways in which these two texts can and have been contrasted. In my text analysis, I seek to identify other ways of comparing these two holy books, first with an an ayah/verse-level analysis and through word-level analysis. 
+
+\np
+
+Data sources: [The Quran Dataset on Kaggle](https://www.kaggle.com/datasets/imrankhan197/the-quran-dataset) and [Bible Corpus on Kaggle](https://www.kaggle.com/datasets/oswinrh/bible?select=t_kjv.csv)
+
+
+## Special Symbols
+In the text of the Quran, these symbols appear semi-regularly: ˹ ˺. They do not appear in the KJV Bible. 
+```{r, echo = FALSE}
+holy_books |>
+  group_by(title) |>
+  summarize(sum(str_detect(text, "˹[A-Za-z ]+˺")),
+            total = n()) |>
+  rename(symbol_count = 2) |>
+  mutate(proportion = symbol_count/total) |>
+  rename("Holy Books" = title, 
+         "Symbol Count" = symbol_count,
+         Total = total,
+         Proportion = proportion) |>
+  kable()
+```
+
+In fact, over half of the ayahs in the Quran include this symbol. We can take a closer look at what kinds of phrases are bracketed in by these symbols:
+```{r, echo = FALSE}
+quran |>
+  filter(str_detect(text, "˹[A-Za-z ]+˺")) |>
+  slice_head(n = 10) |>
+  select(surah_chapter, ayah_verse, text) |>
+  mutate(surah_chapter = surah_chapter, 
+         ayah_verse = ayah_verse, 
+         text = text, 
+         symbol = str_extract(text, "˹[A-Za-z ]+˺")) |>
+  rename("Surah Number" = surah_chapter,
+         "Ayah Number" = ayah_verse,
+         "Ayah Text" = text, 
+         "Symbol Text" = symbol) |>
+  kable()
+```
+
+It is unclear to me exactly what this symbol is intended to indicate as these symbols do not appear in the original Arabic of the Quran or in typical English translations. Generally, they seem to perhaps correlate with instances in which those words contained in the brackets might be emphasized. 
+
+Given that this symbol does not appear in most translations of the Quran, it is not necessarily a crucial point of analysis in comparing and contrasting the Quran with the KJV Bible. It does, however, raise an important point about symbols. In the original writings of the Quran and in many translations, the text contains symbols which indicate_________. This is a major difference between the Quran and the Bible, as the Bible does not contain these types of symbols. 
+
+
+
+
+
+## Dialogue
+How often does dialogue appear in these two Holy Books? We can first asses this through counts and proportions of instances in which quotation marks (" ") appear. 
+```{r, echo = FALSE}
+holy_books |>
+  group_by(title)|>
+  summarize(sum(str_detect(text, "\\\".+\\\"")),
+            total  = n()) |>
+  rename(quote_count = 2) |>
+  mutate(proportion = quote_count/total) |>
+  rename(Title = title, 
+         "Quotation Count" = quote_count,
+         Total = total,
+         Proportion = proportion) |>
+  kable()
+```
+Interestingly, the KJV Bible does not use any quotation marks, while nearly a fifth of the verses in the Quran contain quotations. 
+
+It is worth noting that many modern translations of the Bible do include quotation marks. The original text of the Bible did not use quotations nor did the original Arabic of the Quran. 
+
+In modern, English translations, however, it is fairly common to include quotation marks as means to indicate speech and dialogue. 
+
+In order to include instances of potential dialogue in the KJV Bible, we will also add in our count instances in which the words "said," "says," "tells," "told," "asks," or "asked" are used. Certainly there are other words which indicate dialogue and likely there are instances in which these words are connect to phrases which aren't dialogue, however, using these words in addition to quotation marks gives us a rough estimate of the use of dialogic phrases. 
+```{r, echo = FALSE}
+holy_books |>
+  group_by(title)|>
+  summarize(sum(str_detect(text, "\\\".+\\\"|said|says|tells|told|asks|asked")),
+            total  = n()) |>
+  rename(dialogue_count = 2) |>
+  mutate(proportion = dialogue_count/total) |>
+  rename(Title = title, 
+         "Dialogue Count" = dialogue_count,
+         Total = total,
+         Proportion = proportion) |>
+  kable()
+```
+
+Once words associated with dialogue are included in the count, we can see that about an 8th of the verses in the Bible contain dialogic phrases while a little over a 5th of the ayahs in the Quran contain do. *Why does the Quran have more dialogue than the KJV Bible?*
+
+
+
+
+## The Divine 
+How do the two books compare when it comes to references to the Divine? In the Quran, the Divine is most often referred to as "Allah," which is Arabic for "God." In this translation of the Quran, Allah/God is also referred to as "Lord," "God," and "Almighty." In the KJV Bible, the Divine is referred to as "God," "LORD," "Lord," and "Almighty." Because God is triune in the Bible (God, Jesus, and Holy Spirit), "Christ," "Jesus," and the "Holy Spirit" can also be considered references to the Divine in the KJV Bible. The Christ/Jesus figure appears in The Quran as a prophet, but the Quranic Christ/Jesus is not Divine. 
+
+```{r, echo = FALSE}
+holy_books |>
+  group_by(title) |>
+  summarize(sum(str_detect(text, "Allah|LORD|Lord|God|Almighty")),
+            total = n()) |>
+  rename(divine_count = 2) |>
+  mutate(proportion = divine_count/total) |>
+  rename(Title = title, 
+         "Divine Count without Jesus/Christ/Holy Spirit" = divine_count,
+         Total = total, 
+         Proportion = proportion) |>
+  kable()
+```
+
+```{r, echo = FALSE}
+holy_books |>
+  group_by(title) |>
+  summarize(sum(str_detect(text, "Allah|LORD|Lord|God|Almighty|Jesus|Christ|Holy Spirit")),
+            total = n()) |>
+  rename(divine_count = 2) |>
+  mutate(proportion = divine_count/total) |>
+  rename(Title = title, 
+         "Divine Count including Jesus/Christ/Holy Spirit" = divine_count,
+         Total = total, 
+         Proportion = proportion) |>
+  kable()
+```
+
+The Divine is referred to in approximately 43% of ayahs in the Quran and about 31% of the verses in the KJV Bible once the triune God is taken into account. These percentages aren't drastically different, but nevertheless, it is clear that the Quran includes more verses with direct reference to God.  *WHY*
+
+
+
+
+## Most common words
+Wordclouds of the most common words in the Quran and in the Bible indicate that 
+```{r, echo = FALSE, results ='hide'}
+# Creating a dataset broken up by individual word 
+holy_books_words <- holy_books |>
+  mutate(text = str_remove_all(text, "˹|˺")) |>
+  unnest_tokens(output = word, input = text)
+
+holy_books_words
+``` 
+ 
+```{r, echo = FALSE, results = 'hide', warning = FALSE, message = FALSE}
+# creating a dataset of the inividual words in the Quran with the stop words removed.  
+quran_no_stop <- holy_books_words |>
+  filter(title == "The Holy Quran") |>
+  anti_join(stop_words) |>
+  count(word) |>
+  arrange(desc(n))
+quran_no_stop
+```
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+
+# Making a wordcloud of the top (non stop) words in the Quran based on size. 
+quran_no_stop_df <- quran_no_stop |>
+  slice_head(n = 80) |>
+  data.frame()
+
+color_assignment <- brewer.pal(9, "Pastel1")
+
+quran_wordcloud <- wordcloud2(
+  quran_no_stop_df, 
+  size = 1, 
+  shape = 'circle',
+  minSize = 1, 
+  color = color_assignment)
+quran_wordcloud
+
+```
+ 
+```{r, echo = FALSE, results = 'hide', warning = FALSE, message = FALSE}
+# creating a dataset of the individual words in the Bible with the stop words removed.  
+bible_no_stop <- holy_books_words |>
+  filter(title == "King James Version Bible") |>
+  anti_join(stop_words) |>
+  count(word) |>
+  arrange(desc(n))
+bible_no_stop
+```
+ 
+```{r, echo = FALSE, results = 'hide', warning = FALSE, message = FALSE}
+#for some reason this worked in my console, but showed up as a blank space when rendered. I tried a lot of different things and my theory is that something about wordcloud2 doesn't like that I am trying to make two different word clouds on the same html. 
+#making a wordcloud of the top (non stop) words in the Bible based on size. 
+bible_no_stop_df <- bible_no_stop |>
+  slice_head(n = 50) |>
+  data.frame()
+
+bible_wordcloud <- wordcloud2(
+  bible_no_stop_df, 
+  size = 1, 
+  shape = 'circle',
+  minSize = 1, 
+  color = color_assignment)
+bible_wordcloud
+```
+
+```{r, echo = FALSE, warning = FALSE}
+# a new word cloud for the most common words in the Bible
+wordcloud(
+  words = bible_no_stop$word, 
+  freq = bible_no_stop$n, 
+  max.words = 80, 
+  random.order = FALSE, 
+  rot.per = 0.35,
+  colors = brewer.pal(9, "Paired"))
+```
+
+
+
+
+## Positive vs. Negative Sentiment Analysis 
+```{r, echo = FALSE}
+
+get_sentiments(lexicon = "bing")
+
+bing_sentiments <- get_sentiments(lexicon = "bing")
+
+holy_books_words |>
+  inner_join(bing_sentiments) |>
+  count(title, index = surah_chapter, sentiment) |>
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) |>
+  mutate(sentiment = positive - negative) |>
+  ggplot(aes(x = index, y = sentiment, fill = title)) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~title, ncol = 2, scales = "free_x") +
+  labs(x = "Surah/Chapter",
+       y = "Sentiment", 
+       title = "Sentiment Trajectory Across the Bible and the Quran")
+
+```
+
+ 
+ 
+## Conclusion
+
+## Sources/Further Reading
+
